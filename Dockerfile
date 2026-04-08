@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 7860
-CMD ["python", "app.py"]
+CMD ["python", "-m", "server.app"]
