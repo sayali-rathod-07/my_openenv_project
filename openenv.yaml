@@ -1,0 +1,18 @@
+version: "1.0"
+name: "email-triage-env"
+description: "Real-world email triage task with 3 difficulty levels."
+entry_point: "src.environment:EmailTriageEnv"
+observation_space:
+  type: "dict"
+  fields:
+    email_id: "string"
+    sender: "string"
+    subject: "string"
+    body: "string"
+    current_folder: "string"
+action_space:
+  type: "dict"
+  fields:
+    category: "string (support|billing|spam)"
+    priority: "string (low|medium|high)"
+    reply_draft: "string"
