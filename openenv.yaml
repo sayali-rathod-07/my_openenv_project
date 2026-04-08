@@ -2,6 +2,35 @@ version: "1.0"
 name: "email-triage-env"
 description: "Real-world email triage task with 3 difficulty levels."
 entry_point: "src.environment:EmailTriageEnv"
+
+tasks:
+  - id: "task_1_support"
+    data:
+      email_id: "001"
+      sender: "customer@example.com"
+      subject: "Broken Link"
+      body: "I cannot access the login page. Please help."
+      current_folder: "inbox"
+      expected_category: "support"
+
+  - id: "task_2_billing"
+    data:
+      email_id: "002"
+      sender: "accounts@example.com"
+      subject: "Invoice #1234"
+      body: "Your payment is overdue by 5 days."
+      current_folder: "inbox"
+      expected_category: "billing"
+
+  - id: "task_3_spam"
+    data:
+      email_id: "003"
+      sender: "win-free-money@scam.com"
+      subject: "YOU WON!"
+      body: "Click here to claim your $1,000,000 prize now!"
+      current_folder: "inbox"
+      expected_category: "spam"
+
 observation_space:
   type: "dict"
   fields:
@@ -10,6 +39,7 @@ observation_space:
     subject: "string"
     body: "string"
     current_folder: "string"
+
 action_space:
   type: "dict"
   fields:

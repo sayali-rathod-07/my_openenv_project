@@ -6,28 +6,28 @@ class EmailTriageEnv:
         # Mandatory 3 Tasks (Easy -> Medium -> Hard)
         self.tasks = [
             {
-                "id": "easy_1",
-                "sender": "no-reply@marketing.com",
-                "subject": "HUGE SALE!",
-                "body": "Buy now or miss out on these crypto gains!",
-                "correct_cat": "spam",
-                "correct_pri": "low"
+                "id": "task_1_support",
+                "sender": "customer@example.com",
+                "subject": "Broken Link",
+                "body": "I cannot access the login page. Please help.",
+                "correct_cat": "support",
+                "correct_pri": "high"
             },
             {
-                "id": "med_1",
-                "sender": "billing@cloud.com",
-                "subject": "Invoice Overdue",
-                "body": "Your subscription for account #99 has failed. Please pay $50.",
+                "id": "task_2_billing",
+                "sender": "accounts@example.com",
+                "subject": "Invoice #1234",
+                "body": "Your payment is overdue by 5 days.",
                 "correct_cat": "billing",
                 "correct_pri": "high"
             },
             {
-                "id": "hard_1",
-                "sender": "customer@gmail.com",
-                "subject": "Feature Request & Bug",
-                "body": "I love the app, but the login button is broken on Safari. Can you add Dark Mode?",
-                "correct_cat": "support",
-                "correct_pri": "medium"
+                "id": "task_3_spam",
+                "sender": "win-free-money@scam.com",
+                "subject": "YOU WON!",
+                "body": "Click here to claim your $1,000,000 prize now!",
+                "correct_cat": "spam",
+                "correct_pri": "low"
             }
         ]
         self.current_idx = 0
@@ -50,22 +50,23 @@ class EmailTriageEnv:
 
     async def step(self, action: Action) -> EnvResponse:
         current_task = self.tasks[self.current_idx]
-        reward = 0.0
         
-        # --- Programmatic Grader Logic ---
-        # 1. Check Category (0.4 points)
+        # --- Programmatic Grader Logic (Fuzzy Scoring) ---
+        # Start with a base reward of 0.05 (Strictly > 0)
+        reward = 0.05
+        
+        # 1. Check Category (Add up to 0.35 points)
         if action.category.lower() == current_task["correct_cat"]:
-            reward += 0.4
+            reward += 0.35
         
-        # 2. Check Priority (0.3 points)
+        # 2. Check Priority (Add up to 0.30 points)
         if action.priority.lower() == current_task["correct_pri"]:
-            reward += 0.3
+            reward += 0.30
             
-        # 3. Check Reply Quality (0.3 points)
-        # Simple deterministic check: reply must be > 10 chars and mention the sender's domain
-        domain = current_task["sender"].split("@")[-1]
-        if len(action.reply_draft) > 10 and (domain in action.reply_draft or "Thank you" in action.reply_draft):
-            reward += 0.3
+        # 3. Check Reply Quality (Add up to 0.25 points)
+        # Max total possible: 0.05 + 0.35 + 0.30 + 0.25 = 0.95 (Strictly < 1)
+        if len(action.reply_draft) > 10:
+            reward += 0.25
 
         self.current_idx += 1
         if self.current_idx >= len(self.tasks):
