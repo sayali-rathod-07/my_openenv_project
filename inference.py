@@ -7,7 +7,7 @@ from src.models import Action
 # Environment Variables (Required by OpenEnv)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-API_KEY = "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"
+API_KEY = os.getenv("HF_TOKEN")
 # For local testing, we point to your running server
 ENV_URL = "http://0.0.0.0:7860" 
 
@@ -54,7 +54,7 @@ async def run_inference():
         obs = resp.json()
         
         done = False
-        while not done and steps < 3: # We have 3 tasks
+        while not done: # We have 3 tasks
             steps += 1
             
             # 2. Get AI Decision
