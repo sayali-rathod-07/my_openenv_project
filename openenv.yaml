@@ -5,31 +5,42 @@ entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
   - id: "task_1_support"
-    data:
-      email_id: "001"
-      sender: "customer@example.com"
-      subject: "Broken Link"
-      body: "I cannot access the login page. Please help."
-      current_folder: "inbox"
-      expected_category: "support"
+    snippet: |
+      from src.environment import EmailTriageEnv
+      from src.models import Action
+      env = EmailTriageEnv()
+      await env.reset()
+      # Test Task 1: Support
+      action = Action(category="support", priority="high", reply_draft="I will help you with the broken link.")
+      res = await env.step(action)
+      assert res.reward > 0.5
 
   - id: "task_2_billing"
-    data:
-      email_id: "002"
-      sender: "accounts@example.com"
-      subject: "Invoice #1234"
-      body: "Your payment is overdue by 5 days."
-      current_folder: "inbox"
-      expected_category: "billing"
+    snippet: |
+      from src.environment import EmailTriageEnv
+      from src.models import Action
+      env = EmailTriageEnv()
+      await env.reset()
+      # Skip to task 2
+      await env.step(Action(category="support", priority="high", reply_draft="test draft"))
+      # Test Task 2: Billing
+      action = Action(category="billing", priority="high", reply_draft="Regarding your overdue invoice.")
+      res = await env.step(action)
+      assert res.reward > 0.5
 
   - id: "task_3_spam"
-    data:
-      email_id: "003"
-      sender: "win-free-money@scam.com"
-      subject: "YOU WON!"
-      body: "Click here to claim your $1,000,000 prize now!"
-      current_folder: "inbox"
-      expected_category: "spam"
+    snippet: |
+      from src.environment import EmailTriageEnv
+      from src.models import Action
+      env = EmailTriageEnv()
+      await env.reset()
+      # Skip to task 3
+      await env.step(Action(category="support", priority="high", reply_draft="test"))
+      await env.step(Action(category="billing", priority="high", reply_draft="test"))
+      # Test Task 3: Spam
+      action = Action(category="spam", priority="low", reply_draft="")
+      res = await env.step(action)
+      assert res.reward > 0.5
 
 observation_space:
   type: "dict"
@@ -43,6 +54,6 @@ observation_space:
 action_space:
   type: "dict"
   fields:
-    category: "string (support|billing|spam)"
-    priority: "string (low|medium|high)"
+    category: "string"
+    priority: "string"
     reply_draft: "string"
