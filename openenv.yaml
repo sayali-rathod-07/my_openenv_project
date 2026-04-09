@@ -10,8 +10,8 @@ tasks:
       from src.models import Action
       env = EmailTriageEnv()
       await env.reset()
-      # Test Task 1: Support
-      action = Action(category="support", priority="high", reply_draft="I will help you with the broken link.")
+      # Test Task 1
+      action = Action(category="support", priority="high", reply_draft="I am helping you.")
       res = await env.step(action)
       assert res.reward > 0.5
 
@@ -21,10 +21,10 @@ tasks:
       from src.models import Action
       env = EmailTriageEnv()
       await env.reset()
-      # Skip to task 2
-      await env.step(Action(category="support", priority="high", reply_draft="test draft"))
-      # Test Task 2: Billing
-      action = Action(category="billing", priority="high", reply_draft="Regarding your overdue invoice.")
+      # Advance to task 2
+      await env.step(Action(category="support", priority="high", reply_draft="test"))
+      # Test Task 2
+      action = Action(category="billing", priority="high", reply_draft="Invoice help.")
       res = await env.step(action)
       assert res.reward > 0.5
 
@@ -34,10 +34,10 @@ tasks:
       from src.models import Action
       env = EmailTriageEnv()
       await env.reset()
-      # Skip to task 3
+      # Advance to task 3
       await env.step(Action(category="support", priority="high", reply_draft="test"))
       await env.step(Action(category="billing", priority="high", reply_draft="test"))
-      # Test Task 3: Spam
+      # Test Task 3
       action = Action(category="spam", priority="low", reply_draft="")
       res = await env.step(action)
       assert res.reward > 0.5
