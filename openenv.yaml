@@ -3,7 +3,7 @@ name: "email-triage-env"
 entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
-  - id: "task_1_support"
+  - id: "task_1_new"
     difficulty: "easy"
     grader:
       type: "llm"
