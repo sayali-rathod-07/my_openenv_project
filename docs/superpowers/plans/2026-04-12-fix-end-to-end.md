@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the email triage OpenEnv project work end-to-end — Docker build, local inference, and validation script.
+**Goal:** Make the email triage OpenEnv project pass submission validation ("3 tasks with graders"), build in Docker, and run inference locally.
 
-**Architecture:** Fix broken dependency pins, harden the inference client against missing credentials and API failures, and add developer tooling (.env.example, run.sh, validation script patch).
+**Architecture:** Fix the grader/rubric setup first (submission blocker), then fix dependencies, harden inference client, and add developer tooling.
 
-**Tech Stack:** Python 3.10, FastAPI, OpenAI SDK, httpx, Docker
+**Tech Stack:** Python 3.10, FastAPI, OpenAI SDK, httpx, Docker, OpenEnv Rubric API
 
 ---
 
@@ -14,6 +14,8 @@
 
 | File | Action | Responsibility |
 |------|--------|---------------|
+| `src/environment.py` | Modify | Extract scoring into Rubric class, add `self.rubric` attribute |
+| `openenv.yaml` | Modify | Fix task IDs, grader type, add spec_version |
 | `requirements.txt` | Modify | Fix version pin, add missing dep |
 | `inference.py` | Modify | Add credential validation, error handling, JSON parse safety |
 | `.env.example` | Create | Document required environment variables |
@@ -22,14 +24,197 @@
 
 ---
 
-### Task 1: Fix Dependencies
+### Task 1: Extract Rubric Class and Fix Environment
+
+**Files:**
+- Modify: `src/environment.py`
+
+- [ ] **Step 1: Add EmailTriageRubric class above EmailTriageEnv**
+
+Add this class before the `EmailTriageEnv` class in `src/environment.py`:
+
+```python
+class EmailTriageRubric:
+    """Programmatic rubric for email triage scoring.
+    
+    Scoring: category match (0.35) + priority match (0.30) + reply quality (0.25) + base (0.05) = max 0.95
+    """
+
+    def forward(self, action, observation, expected) -> float:
+        reward = 0.05
+
+        if action.category.lower() == expected["correct_cat"]:
+            reward += 0.35
+
+        if action.priority.lower() == expected["correct_pri"]:
+            reward += 0.30
+
+        if len(action.reply_draft) > 10:
+            reward += 0.25
+
+        return round(reward, 2)
+
+    def __call__(self, action, observation, expected) -> float:
+        return self.forward(action, observation, expected)
+```
+
+- [ ] **Step 2: Integrate rubric into EmailTriageEnv**
+
+In `EmailTriageEnv.__init__`, add after `self.done = False`:
+
+```python
+        self.rubric = EmailTriageRubric()
+```
+
+- [ ] **Step 3: Replace inline scoring in step() with rubric call**
+
+In the `step` method, replace the inline scoring block (lines 54-69):
+
+```python
+        # --- Programmatic Grader Logic (Fuzzy Scoring) ---
+        # Start with a base reward of 0.05 (Strictly > 0)
+        reward = 0.05
+        
+        # 1. Check Category (Add up to 0.35 points)
+        if action.category.lower() == current_task["correct_cat"]:
+            reward += 0.35
+        
+        # 2. Check Priority (Add up to 0.30 points)
+        if action.priority.lower() == current_task["correct_pri"]:
+            reward += 0.30
+            
+        # 3. Check Reply Quality (Add up to 0.25 points)
+        # Max total possible: 0.05 + 0.35 + 0.30 + 0.25 = 0.95 (Strictly < 1)
+        if len(action.reply_draft) > 10:
+            reward += 0.25
+```
+
+With:
+
+```python
+        reward = self.rubric(action, self._get_obs(), current_task)
+```
+
+- [ ] **Step 4: Verify server starts and scoring still works**
+
+Run:
+```bash
+python3 -c "
+from src.environment import EmailTriageEnv
+from src.models import Action
+import asyncio
+
+async def test():
+    env = EmailTriageEnv()
+    obs = await env.reset()
+    print('reset OK:', obs.email_id)
+    action = Action(category='support', priority='high', reply_draft='We are looking into this issue.')
+    result = await env.step(action)
+    print('step OK, reward:', result.reward, '(expected 0.95)')
+    assert result.reward == 0.95, f'Expected 0.95, got {result.reward}'
+    print('PASS')
+
+asyncio.run(test())
+"
+```
+
+Expected: `step OK, reward: 0.95 (expected 0.95)` and `PASS`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/environment.py
+git commit -m "refactor: extract scoring into EmailTriageRubric class with forward() method"
+```
+
+---
+
+### Task 2: Fix openenv.yaml
+
+**Files:**
+- Modify: `openenv.yaml`
+
+- [ ] **Step 1: Rewrite openenv.yaml with correct schema**
+
+Replace the entire `openenv.yaml` with:
+
+```yaml
+name: email-triage-env
+version: "1.0.0"
+description: "Email triage and automation environment for OpenEnv"
+spec_version: 1
+entry_point: "src.environment:EmailTriageEnv"
+
+tasks:
+  - id: "task_1_support"
+    difficulty: "easy"
+    description: "Classify a customer support email about a broken login page link"
+    grader:
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
+
+  - id: "task_2_billing"
+    difficulty: "medium"
+    description: "Classify a billing email about an overdue payment invoice"
+    grader:
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
+
+  - id: "task_3_spam"
+    difficulty: "hard"
+    description: "Classify an obvious spam email claiming a prize"
+    grader:
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
+
+observation_space:
+  type: "dict"
+  fields:
+    email_id: "string"
+    sender: "string"
+    subject: "string"
+    body: "string"
+    current_folder: "string"
+
+action_space:
+  type: "dict"
+  fields:
+    category: "string"
+    priority: "string"
+    reply_draft: "string"
+```
+
+Key changes:
+- Task IDs now match `environment.py`: `task_1_support`, `task_2_billing`, `task_3_spam`
+- Grader type changed from `"llm"` to `"programmatic"` with `entry_point` referencing the Rubric class
+- Added `spec_version: 1`
+- Real task descriptions instead of generic "Basic/Intermediate/Complex email triage task"
+
+- [ ] **Step 2: Verify YAML is valid**
+
+Run: `python3 -c "import yaml; yaml.safe_load(open('openenv.yaml')); print('YAML valid')"`
+
+Expected: `YAML valid`
+
+(If pyyaml not installed: `python3 -m pip install pyyaml` first)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add openenv.yaml
+git commit -m "fix: align task IDs with environment, use programmatic graders referencing Rubric class"
+```
+
+---
+
+### Task 3: Fix Dependencies
 
 **Files:**
 - Modify: `requirements.txt`
 
-- [ ] **Step 1: Fix openenv-core version pin**
+- [ ] **Step 1: Fix openenv-core version pin and add openai**
 
-Change `requirements.txt` to:
+Replace `requirements.txt` with:
 
 ```
 fastapi>=0.104.0
@@ -48,13 +233,7 @@ Run: `python3 -m pip install -r requirements.txt 2>&1 | tail -5`
 
 Expected: All packages install successfully with no errors.
 
-- [ ] **Step 3: Verify Docker build succeeds**
-
-Run: `docker build -t email-triage-test /Users/satish/RL/my_openenv_project 2>&1 | tail -10`
-
-Expected: Build completes with "Successfully built" or "Successfully tagged".
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add requirements.txt
@@ -63,16 +242,24 @@ git commit -m "fix: pin openenv-core==0.1.0 and add missing openai dependency"
 
 ---
 
-### Task 2: Harden Inference Client
+### Task 4: Harden Inference Client
 
 **Files:**
 - Modify: `inference.py`
 
-- [ ] **Step 1: Add HF_TOKEN validation at startup**
+- [ ] **Step 1: Add sys import and HF_TOKEN validation at startup**
 
-Replace lines 8-14 of `inference.py` with:
+Replace lines 1-14 of `inference.py` with:
 
 ```python
+import os
+import sys
+import asyncio
+import json
+import httpx
+from openai import OpenAI
+from src.models import Action
+
 # Environment Variables (Required by OpenEnv)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
@@ -89,20 +276,11 @@ if not API_KEY:
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 ```
 
-Also add `sys` to the imports at the top:
+Note: `json` is now imported at the top instead of inside `get_agent_action`.
 
-```python
-import os
-import sys
-import asyncio
-import httpx
-from openai import OpenAI
-from src.models import Action
-```
+- [ ] **Step 2: Add error handling to get_agent_action**
 
-- [ ] **Step 2: Add error handling to LLM call**
-
-Replace the `get_agent_action` function (lines 26-43) with:
+Replace the `get_agent_action` function with:
 
 ```python
 async def get_agent_action(obs):
@@ -127,7 +305,6 @@ async def get_agent_action(obs):
         print("  Check your HF_TOKEN and network connection.")
         sys.exit(1)
 
-    import json
     raw = response.choices[0].message.content
     try:
         return json.loads(raw)
@@ -137,17 +314,18 @@ async def get_agent_action(obs):
         sys.exit(1)
 ```
 
-- [ ] **Step 3: Verify inference.py imports cleanly**
+- [ ] **Step 3: Verify HF_TOKEN validation works**
 
-Run: `python3 -c "import sys; sys.argv = ['inference.py']; exec(open('inference.py').read().split('if __name__')[0])" 2>&1`
+Run: `HF_TOKEN="" python3 inference.py 2>&1`
 
-Expected: Exits with HF_TOKEN error (since we don't have a real token), confirming the validation works. The error message should be our clear one, not the cryptic OpenAI SDK error.
+Expected output:
+```
+[ERROR] HF_TOKEN environment variable is not set.
+  Get your token at: https://huggingface.co/settings/tokens
+  Then run: export HF_TOKEN=hf_your_token_here
+```
 
-Alternatively, simpler check:
-
-Run: `HF_TOKEN="" python3 -c "from inference import *" 2>&1`
-
-Expected: `[ERROR] HF_TOKEN environment variable is not set.`
+Exit code should be 1.
 
 - [ ] **Step 4: Commit**
 
@@ -158,7 +336,7 @@ git commit -m "fix: validate HF_TOKEN at startup and handle LLM API errors grace
 
 ---
 
-### Task 3: Create .env.example
+### Task 5: Create .env.example
 
 **Files:**
 - Create: `.env.example`
@@ -188,7 +366,7 @@ git commit -m "docs: add .env.example with required environment variables"
 
 ---
 
-### Task 4: Create run.sh Launcher
+### Task 6: Create run.sh Launcher
 
 **Files:**
 - Create: `run.sh`
@@ -259,7 +437,7 @@ git commit -m "feat: add run.sh launcher for server and inference"
 
 ---
 
-### Task 5: Patch Validation Script
+### Task 7: Patch Validation Script
 
 **Files:**
 - Modify: `validate-submission.sh:158-176`
@@ -318,7 +496,7 @@ git commit -m "fix: skip openenv validate gracefully when CLI not available"
 
 ---
 
-### Task 6: End-to-End Verification
+### Task 8: End-to-End Verification
 
 - [ ] **Step 1: Docker build**
 
@@ -327,8 +505,6 @@ Run: `docker build -t email-triage-test /Users/satish/RL/my_openenv_project 2>&1
 Expected: Successful build.
 
 - [ ] **Step 2: Start server and test endpoints**
-
-Run the Docker container, then hit `/reset` and `/step` endpoints to confirm the full Docker path works:
 
 ```bash
 docker run -d -p 7860:7860 --name email-triage-test email-triage-test
@@ -349,11 +525,11 @@ docker stop email-triage-test && docker rm email-triage-test
 
 Expected: `reset: 200 task_1_support` and `step: 200 reward: 0.95`
 
-- [ ] **Step 3: Run validation script (steps 1-2 will be skipped without live HF Space, step 3 should skip gracefully)**
+- [ ] **Step 3: Verify rubric is importable from entry_point path**
 
-Run: `bash validate-submission.sh http://localhost:9999 /Users/satish/RL/my_openenv_project 2>&1 | tail -10`
+Run: `python3 -c "from src.environment import EmailTriageRubric; r = EmailTriageRubric(); print('Rubric importable:', r)"`
 
-This will fail at step 1 (no live space), which is expected. The important thing is the script doesn't crash on syntax errors.
+Expected: `Rubric importable: <src.environment.EmailTriageRubric object at ...>`
 
 - [ ] **Step 4: Final commit if any fixes needed**
 
