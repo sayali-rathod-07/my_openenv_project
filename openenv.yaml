@@ -5,31 +5,25 @@ entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
   - id: "task_1_support"
-    snippet: |
-      from src.environment import EmailTriageEnv
-      env = EmailTriageEnv()
-      obs = await env.reset()
-      assert obs.email_id == "task_1_support"
+    difficulty: "easy"
+    description: "Categorize a basic customer support email."
+    grader:
+      type: "llm"
+      prompt_template: "Score the agent's ability to identify this as a support ticket and assign high priority. Score 0.0 to 1.0."
 
   - id: "task_2_billing"
-    snippet: |
-      from src.environment import EmailTriageEnv
-      env = EmailTriageEnv()
-      await env.reset()
-      # Manually advance index to simulate second task for the grader
-      env.current_idx = 1
-      obs = env._get_obs()
-      assert obs.email_id == "task_2_billing"
+    difficulty: "medium"
+    description: "Identify and prioritize a billing/overdue invoice email."
+    grader:
+      type: "llm"
+      prompt_template: "Score the agent's ability to identify the billing nature and high priority of this overdue invoice. Score 0.0 to 1.0."
 
   - id: "task_3_spam"
-    snippet: |
-      from src.environment import EmailTriageEnv
-      env = EmailTriageEnv()
-      await env.reset()
-      # Manually advance index to simulate third task for the grader
-      env.current_idx = 2
-      obs = env._get_obs()
-      assert obs.email_id == "task_3_spam"
+    difficulty: "hard"
+    description: "Recognize a high-pressure scam/spam email."
+    grader:
+      type: "llm"
+      prompt_template: "Score the agent's ability to correctly identify this as spam and assign low priority. Score 0.0 to 1.0."
 
 observation_space:
   type: "dict"
