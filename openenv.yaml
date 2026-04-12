@@ -1,29 +1,31 @@
-version: "1.0"
-name: "email-triage-test"
+name: email-triage-env
+version: "1.0.0"
+description: "Email triage and automation environment for OpenEnv"
+spec_version: 1
 entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
-  - id: "task_1_easy"
+  - id: "task_1_support"
     difficulty: "easy"
-    description: "Basic email triage task"
+    description: "Classify a customer support email about a broken login page link"
     grader:
-      type: "llm"
-      prompt_template: "Score the email triage performance 0.0 to 1.0..."
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
 
-  - id: "task_2_medium"
+  - id: "task_2_billing"
     difficulty: "medium"
-    description: "Intermediate email triage task"
+    description: "Classify a billing email about an overdue payment invoice"
     grader:
-      type: "llm"
-      prompt_template: "Score the email triage performance 0.0 to 1.0..."
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
 
-  - id: "task_3_hard"
+  - id: "task_3_spam"
     difficulty: "hard"
-    description: "Complex email triage task"
+    description: "Classify an obvious spam email claiming a prize"
     grader:
-      type: "llm"
-      prompt_template: "Score the email triage performance 0.0 to 1.0..."
-      
+      type: "programmatic"
+      entry_point: "src.environment:EmailTriageRubric"
+
 observation_space:
   type: "dict"
   fields:
@@ -39,4 +41,3 @@ action_space:
     category: "string"
     priority: "string"
     reply_draft: "string"
-    
