@@ -1,29 +1,23 @@
 version: "1.0"
 name: "email-triage-env"
-description: "Real-world email triage task with 3 difficulty levels."
 entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
   - id: "task_1_support"
     difficulty: "easy"
-    description: "Categorize a basic customer support email."
     grader:
       type: "llm"
-      prompt_template: "Score the agent's ability to identify this as a support ticket and assign high priority. Score 0.0 to 1.0."
-
+      prompt_template: "Score 0 to 1"
   - id: "task_2_billing"
     difficulty: "medium"
-    description: "Identify and prioritize a billing/overdue invoice email."
     grader:
       type: "llm"
-      prompt_template: "Score the agent's ability to identify the billing nature and high priority of this overdue invoice. Score 0.0 to 1.0."
-
+      prompt_template: "Score 0 to 1"
   - id: "task_3_spam"
     difficulty: "hard"
-    description: "Recognize a high-pressure scam/spam email."
     grader:
       type: "llm"
-      prompt_template: "Score the agent's ability to correctly identify this as spam and assign low priority. Score 0.0 to 1.0."
+      prompt_template: "Score 0 to 1"
 
 observation_space:
   type: "dict"
