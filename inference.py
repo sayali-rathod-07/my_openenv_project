@@ -1,5 +1,7 @@
 import os
+import sys
 import asyncio
+import json
 import httpx
 from openai import OpenAI
 from src.models import Action
@@ -9,7 +11,13 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 API_KEY = os.getenv("HF_TOKEN")
 # For local testing, we point to your running server
-ENV_URL = "http://0.0.0.0:7860" 
+ENV_URL = "http://0.0.0.0:7860"
+
+if not API_KEY:
+    print("[ERROR] HF_TOKEN environment variable is not set.")
+    print("  Get your token at: https://huggingface.co/settings/tokens")
+    print("  Then run: export HF_TOKEN=hf_your_token_here")
+    sys.exit(1)
 
 client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
@@ -25,7 +33,7 @@ def log_end(success: bool, steps: int, score: float, rewards: list):
 
 async def get_agent_action(obs):
     prompt = f"""
-    You are an Email Triage Agent. 
+    You are an Email Triage Agent.
     Email from: {obs['sender']}
     Subject: {obs['subject']}
     Body: {obs['body']}
@@ -33,14 +41,25 @@ async def get_agent_action(obs):
     Respond ONLY with a JSON object in this format:
     {{"category": "spam|billing|support", "priority": "low|medium|high", "reply_draft": "your message here"}}
     """
-    
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={ "type": "json_object" }
-    )
-    import json
-    return json.loads(response.choices[0].message.content)
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={ "type": "json_object" }
+        )
+    except Exception as e:
+        print(f"[ERROR] LLM API call failed: {e}")
+        print("  Check your HF_TOKEN and network connection.")
+        sys.exit(1)
+
+    raw = response.choices[0].message.content
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        print(f"[ERROR] LLM returned invalid JSON: {raw[:200]}")
+        print("  The model may not support json_object response format.")
+        sys.exit(1)
 
 async def run_inference():
     log_start("email-triage-task")
