@@ -1,19 +1,19 @@
 version: "1.0"
-name: "email-triage-env"
+name: "email-triage-env-v2"
 entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
-  - id: "task_1_new"
+  - id: "task_1_sup"
     difficulty: "easy"
     grader:
       type: "llm"
       prompt_template: "Score 0 to 1"
-  - id: "task_2_billing"
+  - id: "task_2_bill"
     difficulty: "medium"
     grader:
       type: "llm"
       prompt_template: "Score 0 to 1"
-  - id: "task_3_spam"
+  - id: "task_3_spm"
     difficulty: "hard"
     grader:
       type: "llm"
