@@ -1,6 +1,30 @@
 import asyncio
 from .models import Observation, Action, EnvResponse
 
+class EmailTriageRubric:
+    """Programmatic rubric for email triage scoring.
+
+    Scoring: category match (0.35) + priority match (0.30) + reply quality (0.25) + base (0.05) = max 0.95
+    """
+
+    def forward(self, action, observation, expected) -> float:
+        reward = 0.05
+
+        if action.category.lower() == expected["correct_cat"]:
+            reward += 0.35
+
+        if action.priority.lower() == expected["correct_pri"]:
+            reward += 0.30
+
+        if len(action.reply_draft) > 10:
+            reward += 0.25
+
+        return round(reward, 2)
+
+    def __call__(self, action, observation, expected) -> float:
+        return self.forward(action, observation, expected)
+
+
 class EmailTriageEnv:
     def __init__(self):
         # Mandatory 3 Tasks (Easy -> Medium -> Hard)
@@ -32,6 +56,7 @@ class EmailTriageEnv:
         ]
         self.current_idx = 0
         self.done = False
+        self.rubric = EmailTriageRubric()
 
     async def reset(self) -> Observation:
         self.current_idx = 0
@@ -51,22 +76,7 @@ class EmailTriageEnv:
     async def step(self, action: Action) -> EnvResponse:
         current_task = self.tasks[self.current_idx]
         
-        # --- Programmatic Grader Logic (Fuzzy Scoring) ---
-        # Start with a base reward of 0.05 (Strictly > 0)
-        reward = 0.05
-        
-        # 1. Check Category (Add up to 0.35 points)
-        if action.category.lower() == current_task["correct_cat"]:
-            reward += 0.35
-        
-        # 2. Check Priority (Add up to 0.30 points)
-        if action.priority.lower() == current_task["correct_pri"]:
-            reward += 0.30
-            
-        # 3. Check Reply Quality (Add up to 0.25 points)
-        # Max total possible: 0.05 + 0.35 + 0.30 + 0.25 = 0.95 (Strictly < 1)
-        if len(action.reply_draft) > 10:
-            reward += 0.25
+        reward = self.rubric(action, self._get_obs(), current_task)
 
         self.current_idx += 1
         if self.current_idx >= len(self.tasks):
