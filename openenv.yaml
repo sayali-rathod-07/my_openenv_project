@@ -1,24 +1,29 @@
 version: "1.0"
-name: "email-triage-env-v2"
+name: "email-triage-test"
 entry_point: "src.environment:EmailTriageEnv"
 
 tasks:
-  - id: "task_1_sup"
+  - id: "task_1_easy"
     difficulty: "easy"
+    description: "Basic email triage task"
     grader:
       type: "llm"
-      prompt_template: "Score 0 to 1"
-  - id: "task_2_bill"
-    difficulty: "medium"
-    grader:
-      type: "llm"
-      prompt_template: "Score 0 to 1"
-  - id: "task_3_spm"
-    difficulty: "hard"
-    grader:
-      type: "llm"
-      prompt_template: "Score 0 to 1"
+      prompt_template: "Score the email triage performance 0.0 to 1.0..."
 
+  - id: "task_2_medium"
+    difficulty: "medium"
+    description: "Intermediate email triage task"
+    grader:
+      type: "llm"
+      prompt_template: "Score the email triage performance 0.0 to 1.0..."
+
+  - id: "task_3_hard"
+    difficulty: "hard"
+    description: "Complex email triage task"
+    grader:
+      type: "llm"
+      prompt_template: "Score the email triage performance 0.0 to 1.0..."
+      
 observation_space:
   type: "dict"
   fields:
@@ -34,3 +39,4 @@ action_space:
     category: "string"
     priority: "string"
     reply_draft: "string"
+    
